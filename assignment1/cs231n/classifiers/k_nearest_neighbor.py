@@ -131,8 +131,8 @@ class KNearestNeighbor(object):
         #########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-        dists = np.reshape(np.sum(self.X_train**2, axis=1), [num_test,1]) + \
-                np.sum(self.X_train**2, axis=1) - 2 * np.matmul(self.X_train, self.X_train.T)
+        dists = np.reshape(np.sum(X**2, axis=1), [num_test,1]) + \
+                np.sum(self.X_train**2, axis=1) - 2 * np.matmul(X, self.X_train.T)
         dists = np.sqrt(dists)
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
