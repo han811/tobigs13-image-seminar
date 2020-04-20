@@ -209,23 +209,22 @@ class FullyConnectedNet(object):
             W_i = 'W' + str(i+1)
             b_i = 'b' + str(i+1)
 
-            # Output layer (without bath normalization)
+            # without bath normalization
             if i == self.num_layers - 1:
                 self.params[W_i] = np.random.randn(hidden_dims[len(hidden_dims)-1],
                     num_classes) * weight_scale
                 self.params[b_i] = np.zeros(num_classes)
-            # With batch normalization
+                
+            # with batch normalization
             else:
-                # First hidden layer
                 if i == 0:
                     self.params[W_i] = np.random.randn(input_dim, hidden_dims[0]) * weight_scale
                     self.params[b_i] = np.zeros(hidden_dims[0])
-                # Intermediate hidden layer
                 else:
                     self.params[W_i] = np.random.randn(hidden_dims[i-1], hidden_dims[i]) * weight_scale
                     self.params[b_i] = np.zeros(hidden_dims[i])
 
-                # Batch or layer normalization layer
+                    
                 if self.normalization in ['batchnorm', 'layernorm']:
                     self.params['gamma'+str(i+1)] = np.ones(hidden_dims[i])
                     self.params['beta'+str(i+1)] = np.zeros(hidden_dims[i])
@@ -298,22 +297,23 @@ class FullyConnectedNet(object):
             W_i = 'W' + str(i+1)
             b_i = 'b' + str(i+1)
 
+            # First hidden layer
             if i == 0:
                 out = X
 
+            # batch normalization
             if self.normalization == 'batchnorm':
-                # affine -> batch norm -> relu
                 fc_out, fc_cache = affine_forward(out, self.params[W_i], self.params[b_i])
                 bn_out, bn_cache = batchnorm_forward(fc_out, self.params['gamma'+str(i+1)],
                     self.params['beta'+str(i+1)], self.bn_params[i])
                 out, relu_cache = relu_forward(bn_out)
                 caches[i+1] = (fc_cache, bn_cache, relu_cache)
 
+            # layer normalization
             elif self.normalization == 'layernorm':
-                # affine -> layer norm -> relu
                 fc_out, fc_cache = affine_forward(out, self.params[W_i], self.params[b_i])
                 ln_out, ln_cache = layernorm_forward(fc_out, self.params['gamma'+str(i+1)],
-                    self.params['beta'+str(i+1)], self.ln_params[i])
+                    self.params['beta'+str(i+1)], self.bn_params[i])
                 out, relu_cache = relu_forward(ln_out)
                 caches[i+1] = (fc_cache, ln_cache, relu_cache)
 
