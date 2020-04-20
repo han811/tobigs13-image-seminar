@@ -539,6 +539,7 @@ def dropout_backward(dout, cache):
         #######################################################################
     elif mode == 'test':
         dx = dout
+        
     return dx
 
 
