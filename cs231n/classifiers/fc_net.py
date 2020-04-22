@@ -210,23 +210,23 @@ class FullyConnectedNet(object):
             W_i = 'W' + str(i+1)
             b_i = 'b' + str(i+1)
 
-            # Output layer (without bath normalization)
+            # 마지막 단은 정규화를 해주면 안됩니다
             if i == self.num_layers - 1:
                 self.params[W_i] = np.random.randn(hidden_dims[len(hidden_dims)-1],
                     num_classes) * weight_scale
                 self.params[b_i] = np.zeros(num_classes)
-            # With batch normalization
+            # batch normalization이 적용되는 부분
             else:
-                # First hidden layer
+                # 처음부분만 따로 고려해주고
                 if i == 0:
                     self.params[W_i] = np.random.randn(input_dim, hidden_dims[0]) * weight_scale
                     self.params[b_i] = np.zeros(hidden_dims[0])
-                # Intermediate hidden layer
+                # 나머지 중간은 알아서 척척척
                 else:
                     self.params[W_i] = np.random.randn(hidden_dims[i-1], hidden_dims[i]) * weight_scale
                     self.params[b_i] = np.zeros(hidden_dims[i])
 
-                # Batch or layer normalization layer
+                # 정규확 이루어진 layer 체크해두기
                 if self.normalization in ['batchnorm', 'layernorm']:
                     self.params['gamma'+str(i+1)] = np.ones(hidden_dims[i])
                     self.params['beta'+str(i+1)] = np.zeros(hidden_dims[i])
@@ -299,17 +299,15 @@ class FullyConnectedNet(object):
 
         caches = {}
 
-        # Don't include the last layer (no relu, no batch normalization, just affine)
         for i in range(self.num_layers-1):
             W_i = 'W' + str(i+1)
             b_i = 'b' + str(i+1)
 
-            # First hidden layer
+            ## 시작은 원래 인풋으로
             if i == 0:
-                # `out` denotes the output from last layer
                 out = X
 
-            # With batch normalization
+            # 배치 정규화 하는 부분
             if self.normalization == 'batchnorm':
                 # affine -> batch norm -> relu
                 fc_out, fc_cache = affine_forward(out, self.params[W_i], self.params[b_i])
@@ -318,7 +316,7 @@ class FullyConnectedNet(object):
                 out, relu_cache = relu_forward(bn_out)
                 caches[i+1] = (fc_cache, bn_cache, relu_cache)
 
-            # With layer normalization
+            # 레이어 정규화 하는 부분
             elif self.normalization == 'layernorm':
                 # affine -> layer norm -> relu
                 fc_out, fc_cache = affine_forward(out, self.params[W_i], self.params[b_i])
@@ -327,7 +325,7 @@ class FullyConnectedNet(object):
                 out, relu_cache = relu_forward(ln_out)
                 caches[i+1] = (fc_cache, ln_cache, relu_cache)
 
-            # Without batch normalization and layer normalization
+            # 그냥 하는 부분
             else:
                 out, caches[i+1] = affine_relu_forward(out, self.params[W_i],
                     self.params[b_i])
@@ -369,16 +367,17 @@ class FullyConnectedNet(object):
         loss, dscores = softmax_loss(scores, y)
 
         for i in range(self.num_layers, 0, -1):
-            # Loss with regularization
+            ####################
+            # L2정규화인거 보이시나욤
+            ####################
+            # reg가 계수 나머지는 1/2*w**2
             loss += 0.5 * self.reg * np.sum(np.square(self.params['W'+str(i)]))
 
-            # Last hidden layer (no batch normalization, no relu, no dropout)
+            # 그냥 진행하는 부분
             if i == self.num_layers:
-                # `dout` denotes gradient of output of the last layer
                 dout, grads['W'+str(i)], grads['b'+str(i)] = affine_backward(dscores,
                     caches[i])
             else:
-                # Dropout backward except the last layer (before relu backward)
                 if self.use_dropout:
                     dout = dropout_backward(dout, caches['dropout'+str(i)])
 

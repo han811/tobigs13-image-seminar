@@ -28,6 +28,10 @@ def affine_forward(x, w, b):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     out = x.reshape(x.shape[0],-1).dot(w)+b
+    ## reshape x의 차원을 변화 여기서는 처음에는 (2,4,5,6)이던 친구가 (2,120)으로 바뀐다
+    ## dot은 다음 array와 hadamard 즉 원소곱이 아닌!!!!!!!! 행렬 곱의 연산이 이루어 진다.
+    ## np.reshape : https://docs.scipy.org/doc/numpy/reference/generated/numpy.reshape.html
+    ## np.dot : https://docs.scipy.org/doc/numpy/reference/generated/numpy.dot.html
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -61,8 +65,10 @@ def affine_backward(dout, cache):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     dx = dout.dot(w.T).reshape(x.shape)
+    ## input shape을 자꾸 이상하게 해두어서 배열끼리 뺄셈을 하기위해 차원을 reshape해주어야한다.
     dw = x.reshape(x.shape[0],-1).T.dot(dout)
     db = np.sum(dout, axis=0)
+    ## 나머지는 뭐 뉴럴넷 보충때 해서 너무 쉽죠?
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -89,6 +95,8 @@ def relu_forward(x):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     out = np.maximum(0, x)
+    ## broadcasting이 일어나서 0과 x의 모든 value들을 비교하고 그중 큰놈으로 채워서 x와 same차원을 반환한다
+    ## https://docs.scipy.org/doc/numpy/reference/generated/numpy.maximum.html
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -116,7 +124,11 @@ def relu_backward(dout, cache):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     mask = np.heaviside(x,0)
+    ## x가 양수이면 1, 음수이면 0, 0이면 뒤에 있는 인자 value로 채워주는 함수
+    ## https://docs.scipy.org/doc/numpy/reference/generated/numpy.heaviside.html
+    
     dx = mask*dout
+    ## element-wise product / hadamard product
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -200,17 +212,17 @@ def batchnorm_forward(x, gamma, beta, bn_param):
         # Ref: https://kratzert.github.io/2016/02/12/understanding-the-gradient-flow-through-the-batch-normalization-layer.html
         mu = np.mean(x, axis=0)
 
-        xmu = x - mu
-        sq = xmu ** 2
+        x_mu = x - mu
+        sq = x_mu ** 2
         var = np.var(x, axis=0)
 
         sqrtvar = np.sqrt(var + eps)
         ivar = 1./sqrtvar
-        xhat = xmu * ivar
+        xhat = x_mu * ivar
 
         out = gamma * xhat + beta
 
-        cache = (xhat, gamma, xmu, ivar, sqrtvar, var, eps)
+        cache = (xhat, gamma, x_mu, ivar, sqrtvar, var, eps)
 
         running_mean = momentum * running_mean + (1 - momentum) * mu
         running_var = momentum * running_var + (1 - momentum) * var
@@ -274,20 +286,20 @@ def batchnorm_backward(dout, cache):
     # Ref: https://kratzert.github.io/2016/02/12/understanding-the-gradient-flow-through-the-batch-normalization-layer.html
     N, D = dout.shape
 
-    xhat, gamma, xmu, ivar, sqrtvar, var, eps = cache
+    xhat, gamma, x_mu, ivar, sqrtvar, var, eps = cache
 
     dbeta = np.sum(dout, axis=0)
     dgamma = np.sum(dout*xhat, axis=0)
     dxhat = dout * gamma
 
-    divar = np.sum(dxhat*xmu, axis=0)
+    divar = np.sum(dxhat*x_mu, axis=0)
     dxmu1 = dxhat * ivar
 
     dsqrtvar = -1. / (sqrtvar**2) * divar
     dvar = 0.5 * 1. / np.sqrt(var+eps) * dsqrtvar
 
     dsq = 1. / N * np.ones((N, D)) * dvar
-    dxmu2 = 2 * xmu * dsq
+    dxmu2 = 2 * x_mu * dsq
 
     dx1 = dxmu1 + dxmu2
 
@@ -333,7 +345,7 @@ def batchnorm_backward_alt(dout, cache):
 
     N, D = dout.shape
     
-    xhat, gamma, xmu, ivar, sqrtvar, var, eps = cache
+    xhat, gamma, x_mu, ivar, sqrtvar, var, eps = cache
 
     dxhat = dout * gamma
     
@@ -392,13 +404,13 @@ def layernorm_forward(x, gamma, beta, ln_param):
 	# Just copy from batch normalization cdoe
     mu = np.mean(x, axis=0)
 
-    xmu = x - mu
-    sq = xmu ** 2
+    x_mu = x - mu
+    sq = x_mu ** 2
     var = np.var(x, axis=0)
 
     sqrtvar = np.sqrt(var + eps)
     ivar = 1./sqrtvar
-    xhat = xmu * ivar
+    xhat = x_mu * ivar
 
     # Transpose back, now shape of xhat (N, D)
     xhat = xhat.T
@@ -406,7 +418,7 @@ def layernorm_forward(x, gamma, beta, ln_param):
     # Just copy from batch normalization cdoe
     out = gamma * xhat + beta
 
-    cache = (xhat, gamma, xmu, ivar, sqrtvar, var, eps)
+    cache = (xhat, gamma, x_mu, ivar, sqrtvar, var, eps)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
@@ -442,7 +454,7 @@ def layernorm_backward(dout, cache):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     # Just copy code from batch normalization backward
-    xhat, gamma, xmu, ivar, sqrtvar, var, eps = cache
+    xhat, gamma, x_mu, ivar, sqrtvar, var, eps = cache
 
     dbeta = np.sum(dout, axis=0)
     dgamma = np.sum(xhat*dout, axis=0)
