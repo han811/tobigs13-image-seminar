@@ -571,28 +571,34 @@ def conv_forward_naive(x, w, b, conv_param):
       W' = 1 + (W + 2 * pad - WW) / stride
     - cache: (x, w, b, conv_param)
     """
-    out = None
     ###########################################################################
     # TODO: Implement the convolutional forward pass.                         #
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    #input
     N, C, H, W = x.shape
     F, _, HH, WW = w.shape
     stride, pad = conv_param['stride'], conv_param['pad']
-    H_out = 1 + (H + 2 * pad - HH) // stride  # Use `//` for python3
+    
+    #output
+    ##data shape
+    H_out = 1 + (H + 2 * pad - HH) // stride
     W_out = 1 + (W + 2 * pad - WW) // stride
     out = np.zeros((N, F, H_out, W_out))
 
-    x_pad = np.pad(x, ((0,), (0,), (pad,), (pad,)), mode='constant', constant_values=0)
+    #padding_가장자리에 0
+    x_pad = np.pad(x, ((0,0), (0,0), (pad,pad), (pad,pad)), mode='constant', constant_values=0)
 
-    for n in range(N):
-        for f in range(F):
-            for h_out in range(H_out):
-                for w_out in range(W_out):
-                    out[n, f, h_out, w_out] = np.sum(x_pad[n, :, h_out*stride:h_out*stride+HH, \
-                                              w_out*stride:w_out*stride+WW]*w[f, :]) + b[f]
+    #convolution
+    for n in range(N): #각 batch에
+        for f in range(F): #각 depth에
+            for h_out in range(H_out): # Stride 세로
+                for w_out in range(W_out): # Stride 가로
+                    out[n, f, h_out, w_out] = np.sum(
+                        x_pad[n, :, h_out*stride:h_out*stride+HH, \
+                                    w_out*stride:w_out*stride+WW]*w[f, :]) + b[f]
 
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -622,28 +628,38 @@ def conv_backward_naive(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    x, w, b, conv_param = cache
+    #input
+    x, w, b, conv_param = cache    #forward의 캐시 그대로 받아줍니다.
     N, C, H, W = x.shape
-    F, _, HH, WW = w.shape
-    _, _, H_out, W_out = dout.shape
+    F, _, HH, WW = w.shape # _에 해당하는건 C
+    N, F, H_out, W_out = dout.shape  #N, F: _로 생략 가능 (like _, _, H_out, W_out)
     stride, pad = conv_param['stride'], conv_param['pad']
 
-    x_pad = np.pad(x, ((0,), (0,), (pad,), (pad,)), mode='constant', constant_values=0)
+    #padding
+    x_pad = np.pad(x, ((0,0), (0,0), (pad,pad), (pad,pad)), mode='constant', constant_values=0)
 
-    dx_pad = np.zeros_like(x_pad)
-    dw = np.zeros_like(w)
-    db = np.zeros_like(b)
+    #initializing 
+    dx_pad = np.zeros(x_pad.shape)
+    dw = np.zeros(w.shape)
+    db = np.zeros(b.shape)
 
-    for n in range(N):
-        for f in range(F):
-            db[f] += np.sum(dout[n, f])
+    
+    for n in range(N): #각 batch
+        for f in range(F): #각 filter
+            db[f] += np.sum(dout[n, f]) #bias 계산: 해당 batch, filter에 해당하는 이미지 크기
             for h_out in range(H_out):
                 for w_out in range(W_out):
-                    dw[f] += x_pad[n, :, h_out*stride:h_out*stride+HH, w_out*stride:w_out*stride+WW] * \
-                    dout[n, f, h_out, w_out]
-                    dx_pad[n, :, h_out*stride:h_out*stride+HH, w_out*stride:w_out*stride+WW] += w[f] * \
-                    dout[n, f, h_out, w_out]
+                    dw[f] += x_pad[n, :, h_out*stride:h_out*stride+HH, \
+                                         w_out*stride:w_out*stride+WW]* \
+                             dout[n, f, h_out, w_out]
+                    
+                    
+                    dx_pad[n, :, h_out*stride:h_out*stride+HH, \
+                                 w_out*stride:w_out*stride+WW] += w[f]*dout[n, f, h_out, w_out]
 
+# dw, dx, db 식 관련 참조: 
+#        https://towardsdatascience.com/backpropagation-in-a-convolutional-layer-24c8d64d8509
+    
     dx = dx_pad[:, :, pad:pad+H, pad:pad+W]
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -678,17 +694,20 @@ def max_pool_forward_naive(x, pool_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    #input
     N, C, H, W = x.shape
     pool_height = pool_param['pool_height']
     pool_width = pool_param['pool_width']
     stride = pool_param['stride']
+    
+    #output size
     H_out = 1 + (H - pool_height) // stride
     W_out = 1 + (W - pool_width) // stride
     out = np.zeros((N, C, H_out, W_out))
 
-    for n in range(N):
-        for h_out in range(H_out):
-            for w_out in range(W_out):
+    for n in range(N): #각 batch
+        for h_out in range(H_out): # Height
+            for w_out in range(W_out): # Width
                 out[n, :, h_out, w_out] = np.max(x[n, :, h_out*stride:h_out*stride+pool_height,\
                           w_out*stride:w_out*stride+pool_width], axis=(-1, -2)) 
 
@@ -717,19 +736,23 @@ def max_pool_backward_naive(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    #input
     x, pool_param = cache
     N, C, H, W = x.shape
     pool_height = pool_param['pool_height']
     pool_width = pool_param['pool_width']
     stride = pool_param['stride']
+    
+    #output size
     H_out = 1 + (H - pool_height) // stride
     W_out = 1 + (W - pool_width) // stride
+    
     dx = np.zeros_like(x)
 
-    for n in range(N):
-        for c in range(C):
-            for h in range(H_out):
-                for w in range(W_out):
+    for n in range(N): # 각 batch
+        for c in range(C): #각 Channel(=filter)
+            for h in range(H_out): # Height
+                for w in range(W_out): # Width
                     ind = np.unravel_index(np.argmax(x[n, c, h*stride:h*stride+pool_height,\
                         w*stride:w*stride+pool_width], axis=None), (pool_height, pool_width))
                     dx[n, c, h*stride:h*stride+pool_height, w*stride:w*stride+pool_width][ind] = dout[n, c, h, w]
@@ -776,10 +799,8 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
 
     N, C, H, W = x.shape
 
-    x_new = np.reshape(np.transpose(x, (0, 2, 3, 1)), (-1, C))
-
-    out, cache = batchnorm_forward(x_new, gamma, beta, bn_param)
-    
+    x_reshape = np.reshape(np.transpose(x, (0, 2, 3, 1)), (-1, C))
+    out, cache = batchnorm_forward(x_reshape, gamma, beta, bn_param)
     out = np.transpose(np.reshape(out, (N, H, W, C)), (0, 3, 1, 2))
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -817,9 +838,7 @@ def spatial_batchnorm_backward(dout, cache):
     N, C, H, W = dout.shape
 
     dout_new = np.reshape(np.transpose(dout, (0, 2, 3, 1)), (-1, C))
-
     dx, dgamma, dbeta = batchnorm_backward_alt(dout_new, cache)
-
     dx = np.transpose(np.reshape(dx, (N, H, W, C)), (0, 3, 1, 2))
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -861,12 +880,13 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
     N, C, H, W = x.shape
-    x = np.reshape(x, (N*G, C//G*H*W))
+    x = np.reshape(x, (N*G, -1)) # = ( N*G, C//G*H*W )
     
     x = x.T
 
     mu = np.mean(x, axis=0)
     
+    # like Layer Norm
     xmu = x - mu
     sq = xmu ** 2
     var = np.var(x, axis=0)
@@ -876,7 +896,7 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     xhat = xmu * ivar
     
     xhat = np.reshape(xhat.T, (N, C, H, W))
-    out = gamma[np.newaxis, :, np.newaxis, np.newaxis] * xhat + beta[np.newaxis, :, np.newaxis, np.newaxis]
+    out = gamma * xhat + beta
 
     cache = (xhat, gamma, xmu, ivar, sqrtvar, var, eps, G)
 
@@ -912,7 +932,7 @@ def spatial_groupnorm_backward(dout, cache):
 
     xhat, gamma, xmu, ivar, sqrtvar, var, eps, G = cache
 
-    dxhat = dout * gamma[np.newaxis, :, np.newaxis, np.newaxis]
+    dxhat = dout * gamma
 
     dbeta = np.sum(dout, axis=(0, 2, 3), keepdims=True)
     dgamma = np.sum(dout*xhat, axis=(0, 2, 3), keepdims=True)
