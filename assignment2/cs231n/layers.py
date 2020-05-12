@@ -640,6 +640,7 @@ def dropout_backward(dout, cache):
     return dx
 
 
+#assignment 2-4 part
 def conv_forward_naive(x, w, b, conv_param):
     """
     A naive implementation of the forward pass for a convolutional layer.
@@ -675,6 +676,28 @@ def conv_forward_naive(x, w, b, conv_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    #필요한 parameter들 정의
+    stride = conv_param['stride']
+    pad = conv_param['pad']
+    N,C,H,W = x.shape
+    F,C,HH,WW = w.shape
+    
+    #다음 convolutional layer로 들어가기 위한 값 계산
+    H_n = int(1 + (H + 2 * pad - HH) / stride)
+    W_n = int(1 + (W + 2 * pad - WW) / stride)
+    X_pad = np.pad(x,((0,0),(0,0),(pad,pad),(pad,pad)),'constant', constant_values=0)
+    out = np.zeros((N,F,H_n,W_n))
+
+    #forward 진행 
+    for i in range(N):
+        for j in range(H_n):
+            for k in range(W_n):
+                for f in range(F):
+                    X_i = X_pad[i]
+                    inp_con = X_i[:,j*stride:j*stride+HH,k*stride:k*stride+WW]
+                    out_con = (inp_con*w[f,:,:,:]).sum() + b[f]
+                    out[i,f,j,k] = out_con
+  
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -704,6 +727,33 @@ def conv_backward_naive(dout, cache):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    #필요한 파라미터 정의
+    x, w, b, conv_param = cache
+    N, C, H, W = x.shape
+    F, C, HH, WW = w.shape
+    stride = conv_param['stride']
+    pad = conv_param['pad']
+
+    #padding
+    x_pad = np.pad(x, ((0, 0), (0, 0), (pad, pad), (pad, pad)), 'constant', constant_values=0)
+    H_n = 1 + (H + 2 * pad - HH) // stride
+    W_n = 1 + (W + 2 * pad - WW) // stride
+
+    #각각 gradient 구함
+    dx_pad = np.zeros_like(x_pad)
+    dx = np.zeros_like(x)
+    dw = np.zeros_like(w)
+    db = np.zeros_like(b)
+
+    #backpropagation 진행
+    for n in range(N):
+        for f in range(F):
+            db[f] += dout[n, f].sum()
+            for j in range(0, H_n):
+                for i in range(0, W_n):
+                    dw[f] += x_pad[n,:,j*stride:j*stride+HH,i*stride:i*stride+WW]*dout[n,f,j,i]
+                    dx_pad[n,:,j*stride:j*stride+HH,i*stride:i*stride+WW] += w[f]*dout[n, f, j, i]
+    dx = dx_pad[:,:,pad:pad+H,pad:pad+W]
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -738,8 +788,28 @@ def max_pool_forward_naive(x, pool_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    #필요한 파라미터 정의
+    N, C, H, W = x.shape
+    pool_height = pool_param['pool_height']
+    pool_width = pool_param['pool_width']
+    stride = pool_param['stride']
 
+    #maxpooling이 포함될 때 공식을 이용
+    #이 때는 no padding is necessary
+    H_n = int(1 + (H - pool_height) / stride)
+    W_n = int(1 + (W - pool_width) / stride)
+
+    out = np.zeros((N,C,H_n,W_n))
+    
+    #forward 진행
+    for i in range(N):
+        for j in range(H_n):
+            for k in range(W_n):
+                for l in range(C):
+                    x_max = x[i,l,stride*j:stride*j+pool_height,stride*k:stride*k+pool_width]
+                    out[i,l,j,k] = np.amax(x_max) #가장 큰 값 반환
+
+    pass
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ###########################################################################
     #                             END OF YOUR CODE                            #
@@ -764,6 +834,28 @@ def max_pool_backward_naive(dout, cache):
     # TODO: Implement the max-pooling backward pass                           #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+    #필요한 정의 정의
+    x,pool_param = cache
+    N, C, H, W = x.shape
+    pool_height = pool_param['pool_height']
+    pool_width = pool_param['pool_width']
+    stride = pool_param['stride']
+
+    #앞서 forward에서 사용되었던 공식과 동일
+    H_n = int(1 + (H - pool_height) / stride)
+    W_n = int(1 + (W - pool_width) / stride)
+
+    #backpropagation 진행 -> dx구함
+    dx = np.zeros_like(x)
+    for i in range(N):
+        for j in range(H_n):
+            for k in range(W_n):
+                for l in range(C):
+                    index = np.argmax(x[i,l,stride*j:stride*j+pool_height,stride*k:stride*k+pool_width]) # 가장 큰 값 인덱스 반환
+                    ind1,ind2 = np.unravel_index(index,(pool_height, pool_width)) #좌표배열로 변환
+
+                    dx[i,l,stride*j:stride*j+pool_height,stride*k:stride*k+pool_width][ind1,ind2] = dout[i,l,j,k] #for문 돌리면서 각각 gradient 구함
 
     pass
 
@@ -796,6 +888,13 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     - out: Output data, of shape (N, C, H, W)
     - cache: Values needed for the backward pass
     """
+    mode = bn_param['mode']
+    eps = bn_param.get('eps', 1e-5)
+    momentum = bn_param.get('momentum', 0.9)
+    _,C,_,_ = x.shape
+    running_mean = bn_param.get('running_mean', np.zeros((1,C,1,1), dtype=x.dtype))
+    running_var = bn_param.get('running_var', np.zeros((1,C,1,1), dtype=x.dtype))
+
     out, cache = None, None
 
     ###########################################################################
@@ -806,6 +905,38 @@ def spatial_batchnorm_forward(x, gamma, beta, bn_param):
     # Your implementation should be very short; ours is less than five lines. #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+    #batch normalization은 train과 test 적용방식이 다름 
+    if mode == 'train':
+      #평균, 분산 구하고
+      #gamma, beta로 scaling, shifting 
+        mu = np.mean(x,axis = (0,2,3),keepdims = True) #평균
+        num = x-mu
+        square_mu = num**2
+        var = np.mean(square_mu,axis = (0,2,3),keepdims = True) #분산
+        sqrtvar = np.sqrt(var + eps)
+        inverse_var = 1/sqrtvar 
+        norm = num*inverse_var #normalization
+
+        gamma = gamma.reshape(1,C,1,1)
+        beta = beta.reshape(1,C,1,1)
+        scale_norm = gamma*norm
+        shift_norm = scale_norm + beta
+        out = shift_norm #batch norm train 끝!
+
+        #이동평균 저장 -> test시 사용함
+
+        running_mean = momentum * running_mean + (1 - momentum) * mu
+        running_var = momentum * running_var + (1 - momentum) * var
+
+        cache = (beta,gamma,norm,num,var,eps,sqrtvar)
+        
+    elif mode == 'test':
+        out_hat = (x-running_mean)/np.sqrt(running_var+eps) #train시 구한 이동평균 사용
+        out = gamma.reshape(1,C,1,1)*out_hat + beta.reshape(1,C,1,1)
+    
+    bn_param['running_mean'] = running_mean
+    bn_param['running_var'] = running_var
 
     pass
 
@@ -840,6 +971,19 @@ def spatial_batchnorm_backward(dout, cache):
     # Your implementation should be very short; ours is less than five lines. #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+    beta,gamma,norm,num,var,eps,sqrtvar = cache
+    #각각의 gradient구함
+    #bath normalization의 backpropagation chain rule 부분 사용
+    N,C,H,W = dout.shape
+    dbeta = np.sum(dout,axis = (0,2,3))
+    dgamma = np.sum(dout*norm,axis = (0,2,3))
+
+    dmu = np.mean(dout, axis=(0,2,3),keepdims = True) 
+    dvar = 2 * np.mean(num*dout, axis=(0,2,3),keepdims = True)
+    dstd= dvar/(2*sqrtvar)
+    dx = gamma.reshape(1,C,1,1)*((dout - dmu)*sqrtvar - dstd*(num))/sqrtvar**2
+    pass
 
     pass
 
@@ -881,6 +1025,32 @@ def spatial_groupnorm_forward(x, gamma, beta, G, gn_param):
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    #group normalization
+    #G: integer number of groups to split into, should be a divisor of C
+    N,C,H,W = x.shape
+    x = x.reshape(N,G,C//G,H,W)
+    #평균, 분사 구함
+    mu = np.mean(x,axis = (2,3,4),keepdims = True)
+    num = x-mu
+    square_mu = num**2
+    var = np.mean(square_mu,axis = (2,3,4),keepdims = True)
+    sqrtvar = np.sqrt(var + eps)
+
+    inverse_var = 1/sqrtvar 
+    norm = num*inverse_var
+    norm = norm.reshape(N,C,H,W)
+    
+    #scale, shift위한 gamma,beta 설정
+    gamma = gamma.reshape(1,C,1,1) #C로 reshape
+    beta = beta.reshape(1,C,1,1)
+    scale_norm = gamma*norm
+    shift_norm = scale_norm + beta
+    out = shift_norm
+
+
+    cache = (beta,gamma,norm,num,var,eps,sqrtvar,G)
+
+
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -910,6 +1080,23 @@ def spatial_groupnorm_backward(dout, cache):
     # This will be extremely similar to the layer norm implementation.        #
     ###########################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+    beta,gamma,norm,num,var,eps,sqrtvar,G = cache
+    #batch normalization backpropagation
+    N,C,H,W = dout.shape
+
+    #각각의 gradient
+    dbeta = np.sum(dout,axis = (0,2,3),keepdims=True)
+    dgamma = np.sum(dout*norm,axis = (0,2,3),keepdims=True)
+
+    dout = (gamma*dout).reshape(N,G,C//G,H,W)
+    
+    dmu = np.mean(dout, axis=(2,3,4),keepdims = True) 
+    dvar = 2 * np.mean(num*dout, axis=(2,3,4),keepdims = True)
+    dstd= dvar/(2*sqrtvar)
+    
+    dx_before = ((dout - dmu)*sqrtvar - dstd*(num))/sqrtvar**2
+    dx = dx_before.reshape(N,C,H,W) #reshape
 
     pass
 
