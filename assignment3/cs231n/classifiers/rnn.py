@@ -142,6 +142,37 @@ class CaptioningRNN(object):
         ############################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+        #(1)use an affine transformation to compute the initial hidden state from the image features
+        h0,cache1 = affine_forward(features, W_proj, b_proj)
+
+        #(2) use a word embedding layer to transform the words in captions_in from indices to vectors
+        x,cache2 = word_embedding_forward(captions_in, W_embed)
+
+        
+        if self.cell_type == 'rnn': #use rnn
+            h,cache3 = rnn_forward(x, h0, Wx, Wh, b)
+        else: #use lstm
+            h,cache3 = lstm_forward(x, h0, Wx, Wh, b)
+
+        #use a temporal affine transformation to compute scores over the vocabulary at every timestep using hiddenstate    
+        score,cache4 = temporal_affine_forward(h, W_vocab, b_vocab)
+        #use a temporal softmax to compute loss using captions_out
+        loss,dscore = temporal_softmax_loss(score, captions_out, mask, verbose=False)
+
+        #backward pass - compute the gradient of the loss
+        dh, dW_vocab, db_vocab = temporal_affine_backward(dscore, cache4)
+        if self.cell_type == 'rnn': #rnn
+           dx, dh0, dWx, dWh, db = rnn_backward(dh, cache3)
+        else: #lstm
+           dx, dh0, dWx, dWh, db = lstm_backward(dh, cache3)
+        dW_embed = word_embedding_backward(dx, cache2)
+        dW_proj = features.T.dot(dh0)
+        db_proj = dh0.sum(axis=0)
+
+        #return값
+        grads = {'W_vocab':dW_vocab, 'b_vocab':db_vocab, 'Wx':dWx, 'Wh':dWh, 
+        'b':db, 'W_embed':dW_embed, 'W_proj':dW_proj, 'b_proj':db_proj}
+        
         pass
 
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -210,6 +241,28 @@ class CaptioningRNN(object):
         # you are using an LSTM, initialize the first cell state to zeros.        #
         ###########################################################################
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+        h0 = features.dot(W_proj) + b_proj
+        c0 = np.zeros(h0.shape)
+
+        V, W = W_embed.shape
+        x = np.ones((N, W)) * W_embed[self._start]
+
+        #make rnn step us
+        for i in range(max_length):
+            if self.cell_type == 'rnn':
+               next_h, _ = rnn_step_forward(x, h0, Wx, Wh, b) #using previous hidden state and the embedded current word
+            else:
+               next_h, next_c, _ = lstm_step_forward(x, h0, c0, Wx, Wh, b)
+               c0 = next_c
+
+        out = next_h.dot(W_vocab) + b_vocab
+        #select the word with the higheset score as the next word
+        
+        max_indices = out.argmax(axis=1)
+        captions[:,i] = max_indices
+        x = W_embed[max_indices]
+        h0 = next_h 
 
         pass
 

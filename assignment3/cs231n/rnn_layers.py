@@ -36,6 +36,9 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    next_h = np.tanh(np.dot(x,Wx) + np.dot(prev_h,Wh)+b)
+    cache = (x,Wx,prev_h,Wh,b,next_h)
+
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -68,6 +71,16 @@ def rnn_step_backward(dnext_h, cache):
     # of the output value from tanh.                                             #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+    x,Wx,prev_h,Wh,b,next_h = cache
+
+    #각각 편미분값
+    dviatanh = (1-next_h*next_h)*dnext_h
+    db = np.sum(dviatanh, axis=0)
+    dWh = np.dot(prev_h.T, dviatanh)
+    dWx = np.dot(x.T, dviatanh)
+    dprev_h = np.dot(dviatanh, Wh.T)
+    dx = np.dot(dviatanh, Wx.T)
 
     pass
 
@@ -104,7 +117,17 @@ def rnn_forward(x, h0, Wx, Wh, b):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
-    pass
+    N,T,D = x.shape
+    N,H = h0.shape 
+    h = np.zeros((N,T,H))
+    hi = h0
+
+    cache = []
+    for i in range(T):
+        xi = x[:,i,:].reshape(N,D)
+        hi,cachei = rnn_step_forward(xi, hi, Wx, Wh, b)
+        h[:,i,:] = hi
+        cache.append(cachei)
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
     ##############################################################################
@@ -140,6 +163,22 @@ def rnn_backward(dh, cache):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    N, T, H = dh.shape
+    dxl, dprev_h, dWx, dWh, db = rnn_step_backward(dh[:,T-1,:], cache[T-1])
+    _,D = dxl.shape
+    dx = np.zeros((N,T,D))
+    dx[:,T-1,:] = dxl
+
+    #derivatives
+    for i in range(T-2, -1, -1):
+        dxi, dprev_hi, dWxi, dWhi, dbi = rnn_step_backward(dh[:,i,:]+dprev_h, cache[i])
+        dx[:,i,:] = dxi
+        dprev_h = dprev_hi
+        dWx += dWxi
+        dWh += dWhi
+        db += dbi
+    dh0 = dprev_h
+
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -171,6 +210,9 @@ def word_embedding_forward(x, W):
     # HINT: This can be done in one line using NumPy's array indexing.           #
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+    out = W[x]
+    cache = (x,W)
 
     pass
 
@@ -205,6 +247,9 @@ def word_embedding_backward(dout, cache):
     ##############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    x, W = cache
+    dW = np.zeros(W.shape)
+    np.add.at(dW, x, dout)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
