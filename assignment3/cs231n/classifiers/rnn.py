@@ -143,25 +143,28 @@ class CaptioningRNN(object):
         # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
         #Forward pass
-        initial_hidden_state = np.dot(features, W_proj) + b_proj
+        hidden0 = np.dot(features, W_proj) + b_proj
 
         word_vector, embed_cache = word_embedding_forward(captions_in, W_embed)
         if self.cell_type == 'rnn':
-            hidden, rnn_cache = rnn_forward(word_vector, initial_hidden_state, Wx, Wh, b)
-            scores, scores_cache = temporal_affine_forward(hidden, W_vocab, b_vocab)
-            loss, dscores = temporal_softmax_loss(scores, captions_out, mask, verbose=False)
+            hidden, rnn_cache = rnn_forward(word_vector, hidden0, Wx, Wh, b)
+        else:
+            hidden, lstm_cache = lstm_forward(word_vector, hidden0, Wx, Wh, b)  
+        scores, scores_cache = temporal_affine_forward(hidden, W_vocab, b_vocab)
+        loss, dscores = temporal_softmax_loss(scores, captions_out, mask, verbose=False)
 
         #Backward pass 
+        dhidden, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dscores, scores_cache)
         if self.cell_type == 'rnn':
-            dhidden, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dscores, scores_cache)
             # reminder; rnn_backward result: dx, dh0, dWx, dWh, db
-            dcaption, dhidden_state0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dhidden, rnn_cache)
-       
+            dcaption, dhidden0, grads['Wx'], grads['Wh'], grads['b'] = rnn_backward(dhidden, rnn_cache)
+        else:
+            dcaption, dhidden0, grads['Wx'], grads['Wh'], grads['b'] = lstm_backward(dhidden, lstm_cache)
     
-            grads['W_embed']= word_embedding_backward(dcaption, embed_cache)
-            grads['W_proj'] = np.dot(features.T, dhidden_state0)
-            grads['b_proj'] = np.sum(dhidden_state0, axis=0)
-
+        grads['W_embed']= word_embedding_backward(dcaption, embed_cache)
+        grads['W_proj'] = np.dot(features.T, dhidden0)
+        grads['b_proj'] = np.sum(dhidden0, axis=0)
+            
         # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
         ############################################################################
         #                             END OF YOUR CODE                             #
