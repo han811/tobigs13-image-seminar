@@ -302,6 +302,18 @@ def lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b):
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    _,H = prev_h.shape
+    a = x.dot(Wx) + prev_h.dot(Wh) + b
+
+    i = sigmoid(a[:,0:H])
+    f = sigmoid(a[:,H:2*H])
+    o = sigmoid(a[:,2*H:3*H])
+    g = np.tanh(a[:,3*H:4*H])
+
+    next_c = f*prev_c + i*g
+    next_h = o*np.tanh(next_c)
+    cache = (next_c,i,f,o,g,x,prev_h,prev_c,Wh,Wx)
+
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -337,6 +349,25 @@ def lstm_step_backward(dnext_h, dnext_c, cache):
     # the output value from the nonlinearity.                                   #
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
+
+    next_c,i,f,o,g,x,prev_h,prev_c,Wh,Wx = cache
+
+    do = dnext_h*np.tanh(next_c)
+    dprev_c = (dnext_c + dnext_h*o*(1-np.tanh(next_c)**2))*f #prev_c에 대한 미분값
+    df = (dnext_c + dnext_h*o*(1-np.tanh(next_c)**2))*prev_c
+    di = g*(dnext_c + dnext_h*o*(1-np.tanh(next_c)**2))
+    dg = i*(dnext_c + dnext_h*o*(1-np.tanh(next_c)**2))
+    dai = i*(1-i)*di
+    daf = f*(1-f)*df
+    dao = o*(1-o)*do
+    dag = (1-g**2)*dg
+    da = np.concatenate((dai,daf,dao,dag),axis = 1)
+    dx = da.dot(Wx.T)
+    dprev_h = da.dot(Wh.T)
+    dWx = x.T.dot(da)
+    dWh = prev_h.T.dot(da)
+    db = np.sum(da,axis = 0)
+    pass
 
     pass
 
@@ -377,6 +408,19 @@ def lstm_forward(x, h0, Wx, Wh, b):
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    N,T,D = x.shape
+    N,H = h0.shape 
+    h = np.zeros((N,T,H))
+    hi = h0
+    ci = np.zeros_like(hi)
+
+    cache = []
+    #lstm forward과정
+    for i in range(T):
+        xi = x[:,i,:].reshape(N,D)
+        hi,ci,cachei = lstm_step_forward(xi, hi, ci, Wx, Wh, b) #lstm_step_forward 사용
+        h[:,i,:] = hi
+        cache.append(cachei)
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
@@ -409,6 +453,21 @@ def lstm_backward(dh, cache):
     #############################################################################
     # *****START OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
 
+    N, T, H = dh.shape
+    dxl, dprev_h, dprev_c, dWx, dWh, db = lstm_step_backward(dh[:,T-1,:],np.zeros_like(dh[:,T-1,:]), cache[T-1])
+    _,D = dxl.shape
+
+    dx = np.zeros((N,T,D))
+    dx[:,T-1,:] = dxl
+    #lstm backward
+    for i in range(T-2, -1, -1): #lstm_step backward 사용
+        dxi, dprev_h, dprev_c, dWxi, dWhi, dbi = lstm_step_backward(dh[:,i,:]+dprev_h,dprev_c, cache[i])
+        dx[:,i,:] = dxi
+        dWx += dWxi
+        dWh += dWhi
+        db += dbi
+        #기울기값 update!
+    dh0 = dprev_h
     pass
 
     # *****END OF YOUR CODE (DO NOT DELETE/MODIFY THIS LINE)*****
